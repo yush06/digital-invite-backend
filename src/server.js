@@ -6,6 +6,7 @@ import cors from "cors";
 import authRoutes from "./routes/authRoutes.js";
 import inviteRoutes from "./routes/inviteRoutes.js";
 import eventRoutes from "./routes/eventRoutes.js";
+import guestRoutes from "./routes/guestRoutes.js";
 
 dotenv.config();
 const app = express();
@@ -18,6 +19,7 @@ app.use(cors());
 app.use("/api/auth", authRoutes);
 app.use("/api/invite", inviteRoutes);
 app.use("/api/events", eventRoutes);
+app.use("/api/guests", guestRoutes);
 
 // MongoDB Connection
 mongoose
