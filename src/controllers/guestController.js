@@ -1,3 +1,5 @@
+import multer from "multer";
+import XLSX from "xlsx";
 import Guest from "../models/Guest.js";
 import Event from "../models/Event.js";
 
@@ -68,6 +70,57 @@ export const deleteGuest = async (req, res) => {
     return res.json({ message: "Guest deleted" });
   } catch (err) {
     console.error("deleteGuest:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Multer setup (store file in memory, not on disk)
+const storage = multer.memoryStorage();
+export const upload = multer({ storage });
+
+// Bulk upload guests via Excel/CSV
+export const bulkUploadGuests = async (req, res) => {
+  try {
+    const { eventId } = req.body;
+    if (!eventId)
+      return res.status(400).json({ message: "eventId is required" });
+
+    const event = await Event.findById(eventId);
+    if (!event) return res.status(404).json({ message: "Event not found" });
+    if (event.createdBy.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    // Check file
+    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+    // Parse file buffer
+    const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+    if (!sheetData.length) {
+      return res.status(400).json({ message: "File is empty" });
+    }
+
+    // Expected columns: Name, Mobile, Email, Relation
+    const guests = sheetData.map((row) => ({
+      name: row.Name,
+      mobile: String(row.Mobile),
+      email: row.Email || "",
+      relation: row.Relation || "",
+      eventId,
+      createdBy: req.user.id,
+    }));
+
+    // Insert into DB
+    await Guest.insertMany(guests);
+
+    return res
+      .status(201)
+      .json({ message: "Guests uploaded successfully", count: guests.length });
+  } catch (err) {
+    console.error("bulkUploadGuests:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };
